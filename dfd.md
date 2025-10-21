@@ -1,5 +1,7 @@
 ## 系統環境圖
 
+![系統環境圖](系統環境圖.drawio(1).png)
+
 ```mermaid
 flowchart LR
   %% External entities
