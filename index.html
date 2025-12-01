@@ -1,0 +1,1292 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Mirror - MI & Edema Prevention</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-cyan': '#22d3ee',
+                        'status-safe': '#10b981',
+                        'status-warning': '#f59e0b',
+                        'status-danger': '#ef4444',
+                        'bg-dark': '#0f172a'
+                    },
+                    boxShadow: {
+                        'glow-safe': '0 0 15px rgba(16, 185, 129, 0.5)',
+                        'glow-danger': '0 0 20px rgba(239, 68, 68, 0.6)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", ui-sans-serif, system-ui;
+        }
+
+        .glass-panel {
+            background-color: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 1rem;
+            transition: transform 0.2s ease;
+        }
+        /* 側邊欄按鈕激活樣式 */
+        .nav-btn-active {
+            background-color: rgba(30, 41, 59, 0.5); /* bg-slate-800/50 */
+            color: white;
+            border-left: 4px solid #22d3ee; /* primary-cyan */
+        }
+
+        .nav-btn-inactive {
+            color: #94a3b8; /* slate-400 */
+        }
+
+            .nav-btn-inactive:hover {
+                color: white;
+                background-color: rgba(30, 41, 59, 0.3);
+            }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .sos-anim {
+            animation: pulse-red 2s infinite;
+        }
+
+        .data-font {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+        }
+
+        .table-row-hover:hover {
+            background-color: rgba(34, 211, 238, 0.05);
+        }
+        /* 小按鈕 active 樣式 */
+        .range-btn-active {
+            background-color: #22d3ee;
+            color: #071025;
+        }
+
+        /* ===== 日期選擇器統一為白色字體/控制項 =====
+           針對不同瀏覽器的內建輸入樣式做處理，確保 date 欄位顯示為 #FFFFFF */
+        input[type="date"] {
+            color: #FFFFFF !important; /* 輸入值文字 */
+            background-color: transparent !important; /* 保持原本背景（若要白底改為 #FFFFFF） */
+            accent-color: #FFFFFF; /* 支援部分瀏覽器的重點色 */
+        }
+
+            /* WebKit-based browsers (Chrome, Edge, Safari) 內部顯示區塊 */
+            input[type="date"]::-webkit-datetime-edit,
+            input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+            input[type="date"]::-webkit-datetime-edit-text,
+            input[type="date"]::-webkit-datetime-edit-day-field,
+            input[type="date"]::-webkit-datetime-edit-month-field,
+            input[type="date"]::-webkit-datetime-edit-year-field {
+                color: #FFFFFF !important;
+                opacity: 1 !important;
+            }
+
+            /* 日曆圖示/選單指示器反色處理，讓圖示在深色背景下可見 */
+            input[type="date"]::-webkit-calendar-picker-indicator {
+                filter: invert(1) grayscale(1) contrast(120%);
+            }
+
+            /* Firefox */
+            input[type="date"]::-moz-focus-inner {
+                color: #FFFFFF !important;
+            }
+
+            input[type="date"]::-moz-placeholder {
+                color: #FFFFFF !important;
+                opacity: 1;
+            }
+
+        /* 若需把整個輸入底色改為白色（文字改成深色），把下面兩行取消註解：
+        input[type="date"] {
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+        }
+        */
+    </style>
+</head>
+<body class="bg-black text-white min-h-screen bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black overflow-hidden">
+
+    <div id="app" class="h-screen p-4 max-w-[1600px] mx-auto">
+
+        <section id="login-view" class="h-full flex flex-col items-center justify-center">
+            <div class="glass-panel p-10 w-full max-w-md text-center border-t-4 border-primary-cyan shadow-2xl">
+                <div class="mb-6 flex justify-center">
+                    <i class="fas fa-heart-pulse text-6xl text-primary-cyan animate-pulse"></i>
+                </div>
+                <h1 class="text-3xl font-bold mb-2 tracking-wider">智慧鏡健康監測</h1>
+                <p class="text-slate-400 mb-8 text-sm">心肌梗塞預防 & 水腫程度分析</p>
+
+                <div class="text-left space-y-4">
+                    <div>
+                        <label class="text-xs text-slate-500 ml-1">帳號 (User / Admin)</label>
+                        <input type="text" id="username" placeholder="輸入 admin 進入管理端" class="w-full bg-slate-800/50 border border-slate-600 rounded p-3 text-white focus:border-primary-cyan outline-none transition-colors">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500 ml-1">密碼</label>
+                        <input type="password" value="1234" class="w-full bg-slate-800/50 border border-slate-600 rounded p-3 text-white outline-none focus:border-primary-cyan">
+                    </div>
+                </div>
+
+                <button id="login-btn" class="w-full mt-8 bg-primary-cyan text-slate-900 font-bold py-3 rounded hover:bg-cyan-400 transition-all shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+                    登入系統
+                </button>
+            </div>
+        </section>
+
+        <div id="user-container" class="hidden flex flex-col md:flex-row h-full gap-4">
+
+            <aside class="w-full md:w-64 glass-panel p-6 flex flex-col flex-shrink-0">
+                <div class="mb-8 flex flex-col items-center border-b border-white/10 pb-6">
+                    <div class="w-16 h-16 rounded-full bg-primary-cyan flex items-center justify-center text-black font-bold text-2xl mb-3">SM</div>
+                    <h2 class="text-xl font-bold tracking-wide">王小明</h2>
+                    <p class="text-xs text-slate-400">ID: U-1001</p>
+                </div>
+
+                <nav class="flex-1 space-y-2">
+                    <button onclick="navTo('dashboard')" id="nav-dashboard" class="w-full text-left p-3 rounded transition-colors nav-btn-active">
+                        <i class="fas fa-chart-line w-6 text-center"></i> 總覽儀表板
+                    </button>
+                    <button onclick="navTo('history')" id="nav-history" class="w-full text-left p-3 rounded transition-colors nav-btn-inactive">
+                        <i class="fas fa-history w-6 text-center"></i> 歷史數據
+                    </button>
+                    <button onclick="navTo('profile')" id="nav-profile" class="w-full text-left p-3 rounded transition-colors nav-btn-inactive">
+                        <i class="fas fa-user-cog w-6 text-center"></i> 用戶資料
+                    </button>
+                </nav>
+
+                <button onclick="logout()" class="mt-auto p-3 text-left text-slate-400 hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors">
+                    <i class="fas fa-sign-out-alt w-6 text-center"></i> 登出系統
+                </button>
+            </aside>
+
+            <main class="flex-1 glass-panel p-6 overflow-y-auto">
+
+                <section id="user-view-dashboard" class="user-subview">
+                    <header class="mb-6 flex justify-between items-center">
+                        <h1 class="text-2xl font-bold">健康狀態總覽</h1>
+                        <span class="text-sm text-slate-400">今日: 2025-12-02</span>
+                    </header>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="glass-panel p-6 relative overflow-hidden bg-slate-800/40">
+                            <div class="absolute -right-6 -top-6 text-9xl text-slate-700 opacity-20"><i class="fas fa-heartbeat"></i></div>
+                            <h2 class="text-primary-cyan text-sm font-bold uppercase tracking-wider mb-1">Risk Assessment</h2>
+                            <h3 class="text-2xl font-bold mb-4">心肌梗塞風險</h3>
+                            <div class="flex items-baseline space-x-3">
+                                <span class="text-6xl font-bold text-status-safe data-font">12%</span>
+                                <span class="bg-status-safe/20 text-status-safe px-3 py-1 rounded-full text-sm font-bold">低風險</span>
+                            </div>
+                            <p class="mt-4 text-slate-400 text-sm">AI 分析：過去 24 小時 HRV 波動穩定，無缺血性變化特徵。</p>
+                        </div>
+
+                        <div class="glass-panel p-6 relative overflow-hidden bg-slate-800/40">
+                            <div class="absolute -right-6 -top-6 text-9xl text-slate-700 opacity-20"><i class="fas fa-shoe-prints"></i></div>
+                            <h2 class="text-status-warning text-sm font-bold uppercase tracking-wider mb-1">Edema Monitor</h2>
+                            <h3 class="text-2xl font-bold mb-4">肢體水腫等級</h3>
+                            <div class="flex items-baseline space-x-3">
+                                <span class="text-6xl font-bold text-status-warning data-font">Lv.2</span>
+                                <span class="bg-status-warning/20 text-status-warning px-3 py-1 rounded-full text-sm font-bold">輕微水腫</span>
+                            </div>
+                            <p class="mt-4 text-slate-400 text-sm">建議：下午 5 點後請抬高雙腿 15 分鐘以促進循環。</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div class="glass-panel p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">Heart Rate</p>
+                                <p class="text-3xl font-bold mt-1 data-font">78 <span class="text-sm text-slate-500 font-normal">bpm</span></p>
+                            </div>
+                            <i class="fas fa-heart text-status-danger text-2xl animate-pulse"></i>
+                        </div>
+                        <div class="glass-panel p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">HRV (Stress)</p>
+                                <p class="text-3xl font-bold mt-1 data-font text-primary-cyan">45 <span class="text-sm text-slate-500 font-normal">ms</span></p>
+                            </div>
+                            <i class="fas fa-wave-square text-primary-cyan text-2xl"></i>
+                        </div>
+                        <div class="glass-panel p-5 flex items-center justify-between">
+                            <div>
+                                <p class="text-slate-400 text-xs uppercase">Blood Pressure</p>
+                                <p class="text-3xl font-bold mt-1 data-font">124/82</p>
+                            </div>
+                            <i class="fas fa-stethoscope text-slate-400 text-2xl"></i>
+                        </div>
+                    </div>
+
+                    <button onclick="alert('SOS 訊號已發送！包含GPS位置與當前心率數據。')" class="w-full glass-panel p-6 bg-status-danger/10 border-status-danger/30 hover:bg-status-danger hover:text-white text-status-danger transition-all group sos-anim">
+                        <div class="flex items-center justify-center space-x-4">
+                            <i class="fas fa-exclamation-triangle text-3xl"></i>
+                            <span class="text-2xl font-bold tracking-[0.2em]">緊急求救 (SOS)</span>
+                        </div>
+                    </button>
+                </section>
+
+                <section id="user-view-history" class="user-subview hidden">
+                    <div class="flex justify-between items-start mb-4">
+                        <h2 class="text-2xl font-bold border-l-4 border-primary-cyan pl-3">生理數據追蹤</h2>
+                        <div class="flex flex-col gap-2">
+                            <div class="bg-slate-800/80 p-2 rounded-lg flex items-center space-x-2 text-sm">
+                                <button onclick="setChartType('mi')" id="btn-chart-mi" class="px-3 py-1 rounded-md chart-btn range-btn-active" data-type="mi">MI 風險</button>
+                                <button onclick="setChartType('edema')" id="btn-chart-edema" class="px-3 py-1 rounded-md chart-btn" data-type="edema">水腫</button>
+                            </div>
+
+                            <!-- 時間區間篩選 -->
+                            <div class="bg-slate-800/80 p-2 rounded-lg flex items-center space-x-2 text-sm">
+                                <div class="flex items-center space-x-1">
+                                    <button class="px-3 py-1 rounded-md range-btn range-btn-active" data-range="7">一週</button>
+                                    <button class="px-3 py-1 rounded-md range-btn" data-range="30">一個月</button>
+                                    <button class="px-3 py-1 rounded-md range-btn" data-range="90">三個月</button>
+                                    <button class="px-3 py-1 rounded-md range-btn" data-range="365">一年</button>
+                                </div>
+                                <div class="flex items-center space-x-1">
+                                    <input type="date" id="start-date" class="bg-slate-900 border border-slate-700 rounded p-1 text-sm text-white hidden">
+                                    <input type="date" id="end-date" class="bg-slate-900 border border-slate-700 rounded p-1 text-sm text-white hidden">
+                                    <button id="custom-toggle" class="px-2 py-1 rounded-md bg-slate-700 text-sm">自訂</button>
+                                    <button id="apply-range-btn" class="px-2 py-1 rounded-md bg-primary-cyan text-xs text-slate-900 ml-1">套用</button>
+                                </div>
+                            </div>
+
+                            <!-- 匯出 CSV -->
+                            <div class="flex justify-end">
+                                <button id="export-csv-btn" class="px-3 py-1 rounded-md bg-slate-800/80 hover:bg-slate-700 text-sm border border-primary-cyan/30 text-primary-cyan">匯出 CSV</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-4 mb-6 h-72">
+                        <canvas id="historyChart"></canvas>
+                    </div>
+
+                    <h3 class="text-lg font-bold mb-3 text-slate-300">詳細紀錄表</h3>
+                    <div class="glass-panel overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-300">
+                            <thead class="bg-slate-800/80 text-primary-cyan uppercase text-xs font-bold tracking-wider">
+                                <tr>
+                                    <th class="p-4 rounded-tl-lg">日期</th>
+                                    <th class="p-4">時間</th>
+                                    <th class="p-4">MI 指數</th>
+                                    <th class="p-4">水腫等級</th>
+                                    <th class="p-4">心率</th>
+                                    <th class="p-4">HRV</th>
+                                    <th class="p-4">血壓</th>
+                                    <th class="p-4 rounded-tr-lg">體溫</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-700/50">
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="user-view-profile" class="user-subview hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-white flex items-center border-b border-white/10 pb-4">
+                        <i class="fas fa-id-card mr-3 text-primary-cyan"></i>使用者檔案
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">姓名</label>
+                            <input id="profile-name" type="text" value="王小明" class="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-primary-cyan outline-none text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">性別</label>
+                            <select id="profile-gender" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                                <option>男</option>
+                                <option>女</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">身高 (cm)</label>
+                            <input id="profile-height" type="number" value="175" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white data-font">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">體重 (kg)</label>
+                            <input id="profile-weight" type="number" value="70.5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white data-font">
+                        </div>
+
+                        <!-- 新增出生日期與年齡 -->
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">出生日期</label>
+                            <input id="profile-birth" type="date" value="1950-01-01" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 text-xs mb-1">年齡 (歲)</label>
+                            <input id="profile-age" type="number" value="75" readonly class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white data-font">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-800/40 p-6 rounded-lg border border-status-danger/20">
+                        <h3 class="text-status-danger font-bold mb-4 flex items-center">
+                            <i class="fas fa-notes-medical mr-2"></i> 特殊病史
+                        </h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded cursor-pointer hover:bg-slate-900 transition-colors">
+                                <span>高血壓</span>
+                                <input type="checkbox" checked class="w-5 h-5 accent-status-danger">
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded cursor-pointer hover:bg-slate-900 transition-colors">
+                                <span>糖尿病 </span>
+                                <input type="checkbox" class="w-5 h-5 accent-status-danger">
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded cursor-pointer hover:bg-slate-900 transition-colors">
+                                <span>慢性腎臟病 </span>
+                                <input type="checkbox" class="w-5 h-5 accent-status-danger">
+                            </label>
+
+                            <!-- 修改：心血管疾病家族史 checkbox 加上 id，並在下方新增隱藏的文字輸入區塊 -->
+                            <div>
+                                <label class="flex items-center justify-between p-3 bg-slate-900/50 rounded cursor-pointer hover:bg-slate-900 transition-colors">
+                                    <span>其他疾病家族史</span>
+                                    <input id="family-cvd-checkbox" type="checkbox" checked class="w-5 h-5 accent-status-danger">
+                                </label>
+
+                                <div id="family-cvd-details-wrap" class="mt-2 hidden">
+                                    <input id="family-cvd-details" type="text" placeholder="請描述家族成員與診斷（例如：父親 - 冠心病、母親 - 高血壓）" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <button id="save-profile-btn" class="w-full mt-8 bg-primary-cyan text-slate-900 font-bold py-3 rounded hover:bg-cyan-400 transition-all shadow-lg">
+                        儲存變更
+                    </button>
+                </section>
+            </main>
+        </div>
+
+        <div id="admin-container" class="hidden flex flex-col md:flex-row h-full gap-4">
+
+            <aside class="w-full md:w-64 glass-panel p-6 flex flex-col flex-shrink-0">
+                <div class="mb-8 border-b border-white/10 pb-6">
+                    <h2 class="text-2xl font-bold text-primary-cyan tracking-wider flex items-center">
+                        <i class="fas fa-user-md mr-3"></i>管理中心
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-2">Smart Mirror Admin v1.0</p>
+                </div>
+
+                <nav class="flex-1 space-y-2">
+                    <button onclick="adminNavTo('dashboard')" id="admin-nav-dashboard" class="w-full text-left p-3 rounded transition-colors nav-btn-active">
+                        <i class="fas fa-tachometer-alt w-6 text-center"></i> 監控總覽
+                    </button>
+                    <button onclick="adminNavTo('patients')" id="admin-nav-patients" class="w-full text-left p-3 rounded transition-colors nav-btn-inactive">
+                        <i class="fas fa-users w-6 text-center"></i> 患者列表
+                    </button>
+                    <button onclick="adminNavTo('settings')" id="admin-nav-settings" class="w-full text-left p-3 rounded transition-colors nav-btn-inactive">
+                        <i class="fas fa-cog w-6 text-center"></i> 系統設定
+                    </button>
+                </nav>
+
+                <button onclick="logout()" class="mt-auto p-3 text-left text-status-danger hover:bg-status-danger/10 rounded transition-colors">
+                    <i class="fas fa-sign-out-alt w-6 text-center"></i> 登出
+                </button>
+            </aside>
+
+            <main class="flex-1 glass-panel p-6 overflow-y-auto">
+
+                <section id="admin-view-dashboard" class="admin-subview">
+                    <header class="flex justify-between items-center mb-8">
+                        <h1 class="text-2xl font-bold">即時監控儀表板</h1>
+                        <div class="text-slate-400 text-sm">System Status: <span class="text-status-safe">● Online</span></div>
+                    </header>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-slate-800/50 p-5 rounded-lg border border-white/5">
+                            <p class="text-slate-400 text-sm">監測總人數</p>
+                            <p class="text-4xl font-bold mt-2 text-white data-font">15</p>
+                        </div>
+                        <div class="bg-slate-800/50 p-5 rounded-lg border border-status-danger/30">
+                            <p class="text-slate-400 text-sm">高風險 (High Risk)</p>
+                            <p class="text-4xl font-bold mt-2 text-status-danger data-font">3</p>
+                        </div>
+                        <div class="bg-slate-800/50 p-5 rounded-lg border border-status-warning/30">
+                            <p class="text-slate-400 text-sm">今日異常警報</p>
+                            <p class="text-4xl font-bold mt-2 text-status-warning data-font">7</p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-bold mb-4 flex items-center text-primary-cyan">
+                        <i class="fas fa-exclamation-circle mr-2"></i> 需要關注的異常狀況
+                    </h3>
+                    <div class="bg-slate-800/30 p-4 rounded-lg border border-status-danger/20">
+                        <p class="text-sm text-slate-300 mb-2">● P-1003 陳阿姨 (危險) - 水腫等級 Lv.5，請立即聯繫。</p>
+                        <p class="text-sm text-slate-300">● P-1005 李大伯 (高風險) - HRV 持續過低。</p>
+                    </div>
+                </section>
+
+                <section id="admin-view-patients" class="admin-subview hidden">
+                    <header class="mb-6">
+                        <h1 class="text-2xl font-bold">完整患者監控清單</h1>
+                        <p class="text-slate-400 text-sm mt-1">依據 AI 風險預測模型自動排序</p>
+                    </header>
+
+                    <div class="overflow-x-auto rounded-lg border border-white/10">
+                        <table class="w-full text-left text-sm text-slate-300">
+                            <thead class="bg-slate-900/80 text-xs uppercase font-bold text-primary-cyan">
+                                <tr>
+                                    <th class="p-4">ID</th>
+                                    <th class="p-4">姓名</th>
+                                    <th class="p-4">風險等級</th>
+                                    <th class="p-4">HRV (ms)</th>
+                                    <th class="p-4">水腫</th>
+                                    <th class="p-4">最後更新</th>
+                                    <th class="p-4">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-patient-list" class="divide-y divide-slate-800">
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="admin-view-settings" class="admin-subview hidden">
+                    <header class="mb-6">
+                        <h1 class="text-2xl font-bold">系統參數設定</h1>
+                        <p class="text-slate-400 text-sm mt-1">調整 AI 判讀閾值與警報規則</p>
+                    </header>
+
+                    <div class="space-y-6 max-w-3xl">
+                        <div class="glass-panel p-6">
+                            <h3 class="text-lg font-bold text-primary-cyan mb-4">心肌梗塞預警閾值</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-slate-400 text-sm mb-2">靜止心率上限警報 (BPM)</label>
+                                    <input type="number" value="100" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-slate-400 text-sm mb-2">HRV 低標警示 (ms)</label>
+                                    <input type="number" value="30" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass-panel p-6">
+                            <h3 class="text-lg font-bold text-status-warning mb-4">水腫監測參數</h3>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-slate-300">啟用紅外線體積測量校正</span>
+                                <input type="checkbox" checked class="w-5 h-5 accent-primary-cyan">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 text-sm mb-2">水腫判定敏感度 (1-10)</label>
+                                <input type="range" min="1" max="10" value="7" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary-cyan">
+                            </div>
+                        </div>
+
+                        <button onclick="alert('系統參數已更新！')" class="px-6 py-3 bg-primary-cyan text-slate-900 font-bold rounded hover:bg-cyan-400 transition-colors">
+                            儲存設定
+                        </button>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Mock Data ---
+        const userHistory = [
+  { "date": "2025-12-02", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 52, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-12-02", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 58, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-12-01", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 52, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-12-01", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-11-30", "time": "20:00", "mi": 15, "edema": 3, "hr": 85, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-11-30", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-29", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-11-29", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-11-28", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-11-28", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-11-27", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-11-27", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-26", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-11-26", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-11-25", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-11-25", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-11-24", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-11-24", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-11-23", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-11-23", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-11-22", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-11-22", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-11-21", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-11-21", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-11-20", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-11-20", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-11-19", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-11-19", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-18", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-11-18", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-11-17", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-11-17", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-11-16", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-11-16", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-11-15", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-11-15", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-14", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-11-14", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-11-13", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-11-13", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-11-12", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-11-12", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-11-11", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-11-11", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-11-10", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-11-10", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-11-09", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-11-09", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-11-08", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-11-08", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-11-07", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-11-07", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-06", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-11-06", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-11-05", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-11-05", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-11-04", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-11-04", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-11-03", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-11-03", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-11-02", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-11-02", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-11-01", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-11-01", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-10-31", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-10-31", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-10-30", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-10-30", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-10-29", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-10-29", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-10-28", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-10-28", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-10-27", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-10-27", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-10-26", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-10-26", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-10-25", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-10-25", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-10-24", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-10-24", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-10-23", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-10-23", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-10-22", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-10-22", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-10-21", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-10-21", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-10-20", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-10-20", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-10-19", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-10-19", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-10-18", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-10-18", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-10-17", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-10-17", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-10-16", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-10-16", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-10-15", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-10-15", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-10-14", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-10-14", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-10-13", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-10-13", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-10-12", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-10-12", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-10-11", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-10-11", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-10-10", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-10-10", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-10-09", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-10-09", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-10-08", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-10-08", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-10-07", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-10-07", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-10-06", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-10-06", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-10-05", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-10-05", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-10-04", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-10-04", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-10-03", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-10-03", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-10-02", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-10-02", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-10-01", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-10-01", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-09-30", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-09-30", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-09-29", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-09-29", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-09-28", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-09-28", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-09-27", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-09-27", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-09-26", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-09-26", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-09-25", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-09-25", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-09-24", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-09-24", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-09-23", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-09-23", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-09-22", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-09-22", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-09-21", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-09-21", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-09-20", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-09-20", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-09-19", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-09-19", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-09-18", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-09-18", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-09-17", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-09-17", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-09-16", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-09-16", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-09-15", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-09-15", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-09-14", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-09-14", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-09-13", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-09-13", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-09-12", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-09-12", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-09-11", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-09-11", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-09-10", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-09-10", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-09-09", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-09-09", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-09-08", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-09-08", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-09-07", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-09-07", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-09-06", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-09-06", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-09-05", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-09-05", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-09-04", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-09-04", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-09-03", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-09-03", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-09-02", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-09-02", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-09-01", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-09-01", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-08-31", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-08-31", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-08-30", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-08-30", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-08-29", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-29", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-08-28", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-08-28", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-08-27", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-08-27", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-08-26", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-08-26", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-08-25", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-25", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-08-24", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-08-24", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-08-23", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-08-23", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-08-22", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-08-22", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-08-21", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-08-21", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-08-20", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-08-20", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-08-19", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-08-19", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-08-18", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-08-18", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-08-17", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-17", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-08-16", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-08-16", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-08-15", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-08-15", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-08-14", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-08-14", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-08-13", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-13", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-08-12", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-08-12", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-08-11", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-08-11", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-08-10", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-08-10", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-08-09", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-08-09", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-08-08", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-08-08", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-08-07", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-08-07", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-08-06", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-08-06", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-08-05", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-05", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-08-04", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-08-04", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-08-03", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-08-03", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-08-02", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-08-02", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-08-01", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-08-01", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-07-31", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-07-31", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-30", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-07-30", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-07-29", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-29", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-07-28", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-07-28", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-07-27", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-07-27", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-26", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-07-26", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-07-25", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-25", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-07-24", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-07-24", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-07-23", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-07-23", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-07-22", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-07-22", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-07-21", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-07-21", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-07-20", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-07-20", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-07-19", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-07-19", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-18", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-07-18", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-07-17", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-17", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-07-16", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-07-16", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-07-15", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-07-15", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-14", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-07-14", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-07-13", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-13", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-07-12", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-07-12", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-07-11", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-07-11", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-07-10", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-07-10", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-07-09", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-07-09", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-07-08", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-07-08", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-07-07", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-07-07", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-06", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-07-06", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-07-05", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-05", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-07-04", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-07-04", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-07-03", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-07-03", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-07-02", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-07-02", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-07-01", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-07-01", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-06-30", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-30", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-06-29", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-06-29", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-06-28", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-06-28", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-06-27", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-06-27", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-06-26", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-26", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-06-25", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-06-25", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-06-24", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-06-24", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-06-23", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-06-23", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-06-22", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-06-22", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-06-21", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-06-21", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-06-20", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-06-20", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-06-19", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-06-19", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-06-18", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-18", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-06-17", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-06-17", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-06-16", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-06-16", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-06-15", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-06-15", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-06-14", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-14", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-06-13", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-06-13", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-06-12", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 51, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-06-12", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-06-11", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-06-11", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/76", "temp": 36.5 },
+  { "date": "2025-06-10", "time": "20:00", "mi": 14, "edema": 2, "hr": 83, "hrv": 50, "bp": "123/80", "temp": 36.6 },
+  { "date": "2025-06-10", "time": "08:00", "mi": 12, "edema": 2, "hr": 73, "hrv": 54, "bp": "119/78", "temp": 36.5 },
+  { "date": "2025-06-09", "time": "20:00", "mi": 16, "edema": 3, "hr": 86, "hrv": 47, "bp": "126/83", "temp": 36.7 },
+  { "date": "2025-06-09", "time": "08:00", "mi": 9, "edema": 1, "hr": 66, "hrv": 65, "bp": "113/73", "temp": 36.3 },
+  { "date": "2025-06-08", "time": "20:00", "mi": 13, "edema": 2, "hr": 80, "hrv": 53, "bp": "120/79", "temp": 36.6 },
+  { "date": "2025-06-08", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 61, "bp": "116/76", "temp": 36.4 },
+  { "date": "2025-06-07", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 49, "bp": "124/81", "temp": 36.7 },
+  { "date": "2025-06-07", "time": "08:00", "mi": 10, "edema": 1, "hr": 71, "hrv": 59, "bp": "117/77", "temp": 36.5 },
+  { "date": "2025-06-06", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 51, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-06", "time": "08:00", "mi": 12, "edema": 2, "hr": 72, "hrv": 55, "bp": "118/78", "temp": 36.5 },
+  { "date": "2025-06-05", "time": "20:00", "mi": 16, "edema": 3, "hr": 87, "hrv": 46, "bp": "127/84", "temp": 36.8 },
+  { "date": "2025-06-05", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "114/74", "temp": 36.3 },
+  { "date": "2025-06-04", "time": "20:00", "mi": 13, "edema": 2, "hr": 81, "hrv": 52, "bp": "121/79", "temp": 36.6 },
+  { "date": "2025-06-04", "time": "08:00", "mi": 11, "edema": 1, "hr": 69, "hrv": 61, "bp": "115/75", "temp": 36.4 },
+  { "date": "2025-06-03", "time": "20:00", "mi": 15, "edema": 3, "hr": 84, "hrv": 48, "bp": "125/82", "temp": 36.7 },
+  { "date": "2025-06-03", "time": "08:00", "mi": 10, "edema": 1, "hr": 70, "hrv": 60, "bp": "116/76", "temp": 36.5 },
+  { "date": "2025-06-02", "time": "20:00", "mi": 14, "edema": 2, "hr": 82, "hrv": 50, "bp": "122/80", "temp": 36.6 },
+  { "date": "2025-06-02", "time": "08:00", "mi": 11, "edema": 1, "hr": 68, "hrv": 62, "bp": "114/74", "temp": 36.4 },
+  { "date": "2025-06-01", "time": "20:00", "mi": 16, "edema": 3, "hr": 88, "hrv": 45, "bp": "128/85", "temp": 36.8 },
+  { "date": "2025-06-01", "time": "08:00", "mi": 9, "edema": 1, "hr": 67, "hrv": 64, "bp": "113/73", "temp": 36.3 }
+];
+
+        const adminPatients = [
+            { id: "P-1003", name: "陳阿姨", risk: "critical", hrv: 25, edema: "Lv.5", update: "1分鐘前" },
+            { id: "P-1005", name: "李大伯", risk: "high", hrv: 32, edema: "Lv.4", update: "5分鐘前" },
+            { id: "P-1008", name: "張先生", risk: "high", hrv: 35, edema: "Lv.3", update: "2分鐘前" },
+            { id: "P-1001", name: "王小明", risk: "low", hrv: 55, edema: "Lv.2", update: "10分鐘前" },
+            { id: "P-1002", name: "林小姐", risk: "low", hrv: 60, edema: "Lv.1", update: "15分鐘前" },
+            { id: "P-1010", name: "吳先生", risk: "warning", hrv: 42, edema: "Lv.3", update: "8分鐘前" },
+        ];
+
+        let chartInstance = null;
+        let currentFilteredHistory = [...userHistory]; // 可被篩選
+        let currentRangeDays = 30; // default 一個月
+        let currentChartType = 'mi'; // 'mi' or 'edema'
+
+        // --- 核心邏輯 ---
+
+        // 登入
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const user = document.getElementById('username').value.trim().toLowerCase();
+            document.getElementById('login-view').classList.add('hidden');
+
+            if (user === 'admin') {
+                document.getElementById('admin-container').classList.remove('hidden');
+                adminNavTo('dashboard'); // 管理端預設頁面
+                renderAdminTable();
+            } else {
+                document.getElementById('user-container').classList.remove('hidden');
+                navTo('dashboard'); // 使用者預設頁面
+            }
+        });
+
+        // 登出
+        function logout() { location.reload(); }
+
+        // --- 使用者導航系統 (側邊欄) ---
+        function navTo(view) {
+            // 隱藏所有子頁面
+            document.querySelectorAll('.user-subview').forEach(el => el.classList.add('hidden'));
+            // 顯示目標頁面
+            document.getElementById(`user-view-${view}`).classList.remove('hidden');
+
+            // 更新按鈕樣式
+            document.querySelectorAll('#user-container aside button').forEach(btn => {
+                if (btn.id.startsWith('nav-')) {
+                    btn.classList.remove('nav-btn-active');
+                    btn.classList.add('nav-btn-inactive');
+                }
+            });
+            const activeBtn = document.getElementById(`nav-${view}`);
+            activeBtn.classList.remove('nav-btn-inactive');
+            activeBtn.classList.add('nav-btn-active');
+
+            if (view === 'history') {
+                // 初始篩選 (一個月) 並渲染
+                applyFilter(currentRangeDays);
+                initChart();
+            }
+
+            if (view === 'profile') {
+                // 初始化年齡 (若有 birth)
+                updateProfileAge();
+
+                // 顯示/隱藏家族史輸入（確保切換到 profile 時狀態正確）
+                const familyCheckbox = document.getElementById('family-cvd-checkbox');
+                const familyWrap = document.getElementById('family-cvd-details-wrap');
+                if (familyCheckbox && familyWrap) {
+                    if (familyCheckbox.checked) familyWrap.classList.remove('hidden');
+                    else familyWrap.classList.add('hidden');
+                }
+            }
+        }
+
+        // --- 管理員導航系統 (側邊欄) ---
+        function adminNavTo(view) {
+            // 隱藏所有子頁面
+            document.querySelectorAll('.admin-subview').forEach(el => el.classList.add('hidden'));
+            // 顯示目標頁面
+            document.getElementById(`admin-view-${view}`).classList.remove('hidden');
+
+            // 更新按鈕樣式
+            document.querySelectorAll('#admin-container aside button').forEach(btn => {
+                if (btn.id.startsWith('admin-nav-')) {
+                    btn.classList.remove('nav-btn-active');
+                    btn.classList.add('nav-btn-inactive');
+                }
+            });
+            const activeBtn = document.getElementById(`admin-nav-${view}`);
+            activeBtn.classList.remove('nav-btn-inactive');
+            activeBtn.classList.add('nav-btn-active');
+        }
+
+        // --- 篩選與匯出功能 ---
+
+        // 將日期字串 "YYYY-MM-DD" 轉 Date
+        function parseYMD(ymd) {
+            const parts = ymd.split('-').map(Number);
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        // 依 range (days) 或自訂區間套用篩選
+        function applyFilter(rangeDays, startDateStr, endDateStr) {
+            const now = new Date();
+            let start = null;
+            let end = null;
+
+            if (startDateStr && endDateStr) {
+                start = new Date(startDateStr);
+                end = new Date(endDateStr);
+            } else {
+                end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+                start = new Date(end);
+                start.setDate(end.getDate() - (rangeDays - 1));
+            }
+
+            // 篩選 userHistory（日期為 YYYY-MM-DD）
+            currentFilteredHistory = userHistory.filter(r => {
+                const d = parseYMD(r.date);
+                return d >= new Date(start.getFullYear(), start.getMonth(), start.getDate()) &&
+                    d <= new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59);
+            }).sort((a, b) => (a.date === b.date) ? (a.time > b.time ? 1 : -1) : (a.date > b.date ? -1 : 1));
+
+            // 更新 table 與圖表
+            renderUserHistoryTable(currentFilteredHistory);
+            updateChartData();
+        }
+
+        // 匯出目前篩選結果為 CSV
+        function exportCsv() {
+            if (!currentFilteredHistory.length) {
+                alert('目前無資料可匯出。');
+                return;
+            }
+            const header = ['日期', '時間', 'MI 指數 (%)', '水腫等級', '心率 (bpm)', 'HRV (ms)', '血壓', '體溫 (°C)'];
+            const rows = currentFilteredHistory.map(r => [
+                r.date, r.time, r.mi, r.edema, r.hr, r.hrv, r.bp, r.temp
+            ]);
+            const csvContent = [header, ...rows].map(e => e.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `history_export_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- 渲染功能 ---
+
+        // 1. 渲染使用者歷史表格 (支援傳入資料)
+        function renderUserHistoryTable(data = currentFilteredHistory) {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            data.forEach(row => {
+                tbody.innerHTML += `
+                                <tr class="table-row-hover border-b border-slate-700/50 transition-colors">
+                                    <td class="p-4 data-font text-slate-400">${row.date}</td>
+                                    <td class="p-4 data-font text-slate-400">${row.time}</td>
+                                    <td class="p-4 font-bold text-primary-cyan">${row.mi}%</td>
+                                    <td class="p-4 font-bold text-status-warning">Lv.${row.edema}</td>
+                                    <td class="p-4 data-font">${row.hr}</td>
+                                    <td class="p-4 data-font">${row.hrv}</td>
+                                    <td class="p-4 data-font">${row.bp}</td>
+                                    <td class="p-4 data-font">${row.temp}°C</td>
+                                </tr>
+                            `;
+            });
+        }
+
+        // 2. 渲染管理員表格 (含排序與樣式)
+        function renderAdminTable() {
+            const riskOrder = { critical: 4, high: 3, warning: 2, low: 1 };
+            const sortedPatients = adminPatients.sort((a, b) => riskOrder[b.risk] - riskOrder[a.risk]);
+
+            const tbody = document.getElementById('admin-patient-list');
+            tbody.innerHTML = '';
+
+            sortedPatients.forEach(p => {
+                let badgeClass = '';
+                let badgeText = '';
+                let rowBg = '';
+
+                switch (p.risk) {
+                    case 'critical':
+                        badgeClass = 'bg-status-danger/20 text-status-danger border border-status-danger/50';
+                        badgeText = '危險 (Critical)';
+                        rowBg = 'bg-status-danger/5';
+                        break;
+                    case 'high':
+                        badgeClass = 'bg-status-danger/20 text-status-danger';
+                        badgeText = '高風險 (High)';
+                        break;
+                    case 'warning':
+                        badgeClass = 'bg-status-warning/20 text-status-warning';
+                        badgeText = '注意 (Warning)';
+                        break;
+                    case 'low':
+                        badgeClass = 'bg-status-safe/20 text-status-safe';
+                        badgeText = '正常 (Low)';
+                        break;
+                }
+
+                tbody.innerHTML += `
+                                <tr class="border-b border-slate-800 hover:bg-slate-800/50 transition-colors ${rowBg}">
+                                    <td class="p-4 data-font text-slate-400">${p.id}</td>
+                                    <td class="p-4 font-bold">${p.name}</td>
+                                    <td class="p-4"><span class="px-2 py-1 rounded text-xs font-bold ${badgeClass}">${badgeText}</span></td>
+                                    <td class="p-4 data-font">${p.hrv}</td>
+                                    <td class="p-4 font-bold text-status-warning">${p.edema}</td>
+                                    <td class="p-4 text-xs text-slate-500">${p.update}</td>
+                                    <td class="p-4">
+                                        <button onclick="alert('開啟 ${p.name} 的詳細醫療報告')" class="text-primary-cyan hover:text-white transition-colors text-sm border border-primary-cyan/30 px-3 py-1 rounded hover:bg-primary-cyan/20">
+                                            查看詳情
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+            });
+        }
+
+        // 3. 圖表功能
+        function initChart() {
+            const ctx = document.getElementById('historyChart').getContext('2d');
+
+            const labels = currentFilteredHistory.map(d => `${d.date.slice(5)} ${d.time}`).reverse();
+            const dataMI = currentFilteredHistory.map(d => d.mi).reverse();
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(34, 211, 238, 0.5)');
+            gradient.addColorStop(1, 'rgba(34, 211, 238, 0.0)');
+
+            if (chartInstance) {
+                // 已建立則直接更新
+                chartInstance.data.labels = labels;
+                chartInstance.data.datasets[0].data = (currentChartType === 'mi') ? dataMI : currentFilteredHistory.map(d => d.edema).reverse();
+                chartInstance.update();
+                return;
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: currentChartType === 'mi' ? '心肌梗塞風險指數 (%)' : '水腫等級',
+                        data: currentChartType === 'mi' ? dataMI : currentFilteredHistory.map(d => d.edema).reverse(),
+                        borderColor: currentChartType === 'mi' ? '#22d3ee' : '#f59e0b',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#000',
+                        pointBorderColor: currentChartType === 'mi' ? '#22d3ee' : '#f59e0b',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // 更新圖表資料（依 currentChartType 與 currentFilteredHistory）
+        function updateChartData() {
+            if (!chartInstance) {
+                initChart();
+                return;
+            }
+            const labels = currentFilteredHistory.map(d => `${d.date.slice(5)} ${d.time}`).reverse();
+            const dataset = chartInstance.data.datasets[0];
+            dataset.data = (currentChartType === 'mi') ? currentFilteredHistory.map(d => d.mi).reverse() : currentFilteredHistory.map(d => d.edema).reverse();
+            dataset.label = currentChartType === 'mi' ? 'MI 風險 (%)' : '水腫等級';
+            dataset.borderColor = currentChartType === 'mi' ? '#22d3ee' : '#f59e0b';
+            dataset.pointBorderColor = currentChartType === 'mi' ? '#22d3ee' : '#f59e0b';
+
+            chartInstance.data.labels = labels;
+            chartInstance.update();
+        }
+
+        window.setChartType = function (type) {
+            currentChartType = type;
+            // 更新按鈕樣式
+            document.getElementById('btn-chart-mi').classList.toggle('range-btn-active', type === 'mi');
+            document.getElementById('btn-chart-edema').classList.toggle('range-btn-active', type === 'edema');
+            updateChartData();
+        }
+
+        // --- 事件綁定（UI 控制） ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // range btns
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // 移除其他 active
+                    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('range-btn-active'));
+                    btn.classList.add('range-btn-active');
+
+                    // 隱藏自訂輸入
+                    document.getElementById('start-date').classList.add('hidden');
+                    document.getElementById('end-date').classList.add('hidden');
+
+                    const days = Number(btn.dataset.range);
+                    currentRangeDays = days;
+                    applyFilter(days);
+                });
+            });
+
+            // custom toggle
+            const customToggle = document.getElementById('custom-toggle');
+            customToggle.addEventListener('click', () => {
+                const s = document.getElementById('start-date');
+                const e = document.getElementById('end-date');
+                const hidden = s.classList.contains('hidden');
+                if (hidden) {
+                    s.classList.remove('hidden');
+                    e.classList.remove('hidden');
+                    // 取消 range 按鈕的 active 樣式
+                    document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('range-btn-active'));
+                } else {
+                    s.classList.add('hidden');
+                    e.classList.add('hidden');
+                }
+            });
+
+            // apply custom
+            document.getElementById('apply-range-btn').addEventListener('click', () => {
+                const s = document.getElementById('start-date').value;
+                const e = document.getElementById('end-date').value;
+                if (!s || !e) {
+                    alert('請選擇起訖日期');
+                    return;
+                }
+                applyFilter(null, s, e);
+            });
+
+            // export csv
+            document.getElementById('export-csv-btn').addEventListener('click', exportCsv);
+
+            // profile birth -> age
+            const birthInput = document.getElementById('profile-birth');
+            birthInput.addEventListener('change', updateProfileAge);
+
+            // family CVd checkbox -> toggle details input
+            const familyCheckbox = document.getElementById('family-cvd-checkbox');
+            const familyWrap = document.getElementById('family-cvd-details-wrap');
+            const familyInput = document.getElementById('family-cvd-details');
+            function toggleFamilyInput() {
+                if (!familyCheckbox || !familyWrap) return;
+                if (familyCheckbox.checked) {
+                    familyWrap.classList.remove('hidden');
+                    familyInput.setAttribute('aria-hidden', 'false');
+                } else {
+                    familyWrap.classList.add('hidden');
+                    familyInput.setAttribute('aria-hidden', 'true');
+                    // retention or clearing: 若不希望清除使用者輸入可移除下一行
+                    // familyInput.value = '';
+                }
+            }
+            if (familyCheckbox) {
+                familyCheckbox.addEventListener('change', toggleFamilyInput);
+                // 初始化狀態
+                toggleFamilyInput();
+            }
+
+            // save profile (示意)
+            document.getElementById('save-profile-btn').addEventListener('click', () => {
+                // 示意：可將 family-cvd-details 的值送到後端或存入設定
+                // const familyDetails = familyInput ? familyInput.value.trim() : '';
+                alert('儲存成功！風險模型參數已更新。');
+            });
+
+            // 初始化：設定一個月按鈕為 active 並套用
+            const defaultBtn = Array.from(document.querySelectorAll('.range-btn')).find(b => b.dataset.range === String(currentRangeDays));
+            if (defaultBtn) {
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('range-btn-active'));
+                defaultBtn.classList.add('range-btn-active');
+            }
+        });
+
+        // 計算並顯示年齡（profile）
+        function updateProfileAge() {
+            const birthVal = document.getElementById('profile-birth').value;
+            if (!birthVal) return;
+            const today = new Date();
+            const b = new Date(birthVal);
+            let age = today.getFullYear() - b.getFullYear();
+            const m = today.getMonth() - b.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < b.getDate())) {
+                age--;
+            }
+            document.getElementById('profile-age').value = age >= 0 ? age : 0;
+        }
+
+        // --- 初始值（確保第一次開啟歷史頁面時可用） ---
+        // page load 不自動切換頁面 — 由 login 控制
+        // 但是確保 chart 仍可以在 history 被打開時正常初始化
+    </script>
+</body>
+</html>
